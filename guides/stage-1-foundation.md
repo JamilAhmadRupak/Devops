@@ -6,6 +6,10 @@
 > wrong with the starter app. Where you will hit a planted problem, you get a hint ladder
 > (L1 → L3) inside a collapsed `Hints` block. Open one level at a time, and only after you
 > have spent 20+ minutes on the problem yourself.
+>
+> **How each step works:** first a short **📘 Learn** box (what the thing is and why it exists,
+> about 5 minutes of reading), then the **do this** commands, then questions for your learning
+> log. The Learn boxes teach the tools. They deliberately leave the log questions for you.
 
 ---
 
@@ -32,7 +36,7 @@ answers to the six "Prove you understand" questions.
 
 ```
 Devops/
-├── trackpoint-challenge/   ← the brief + these guides (public repo "Devops")
+├── challenge-trackpoint/   ← the brief + these guides (public repo "Devops")
 ├── trackpoint/             ← YOUR PROJECT REPO. All Stage 1 deliverables go here.
 └── trackpoint-mentor-sealed/
 ```
@@ -40,7 +44,7 @@ Devops/
 Everything you produce in Stage 1 (docs, Makefile, `.github/` files, systemd units, scripts) is
 committed to **`trackpoint`**, because that becomes your portfolio repo (Appendix A layout).
 Create `trackpoint/docs/learning-log.md` there and use it from now on. The empty one in
-`trackpoint-challenge/docs/` can be deleted.
+`challenge-trackpoint/docs/` can be deleted.
 
 ### 0.3 Which shell runs which command
 
@@ -67,9 +71,59 @@ The learning log is graded. Add an entry every time something surprises you, usi
 **Fix / takeaway:** what I changed or learned
 ```
 
+### 0.5 Survival kit: how to read the commands in this guide
+
+You'll type a lot of Bash. These patterns cover almost every line in this guide:
+
+| You see | It means |
+|---|---|
+| `cd /opt/trackpoint` | Change directory. Linux paths use `/`, start at `/` (the root of the disk) and are case-sensitive. `~` is your home folder |
+| `sudo <cmd>` | Run one command as **root** (the administrator). It asks for *your* password, not root's |
+| `cmd1 \| cmd2` | Pipe: the output of `cmd1` becomes the input of `cmd2`, e.g. `ss -tlnp \| grep 5432` |
+| `cmd > file` / `cmd >> file` | Write the output to a file (overwrite / append) |
+| `echo x \| sudo tee file` | Write to a file only root may write. `sudo echo x > file` fails, because the `>` runs as you, not as root |
+| `cat <<'EOF'` … `EOF` | Heredoc: every line between the two markers is fed in as text. The quotes around `'EOF'` stop `$` from being expanded |
+| `VAR=value`, `$VAR`, `$(cmd)` | Set a shell variable, use it, insert the output of a command |
+| `cmd1 && cmd2` | Run `cmd2` only if `cmd1` succeeded |
+| `\` at the end of a line | The command continues on the next line |
+| `cmd --help`, `man cmd` | Built-in documentation. Inside `man`: `/word` searches, `n` finds the next match, `q` quits |
+
+**Exit codes.** Every command returns a number when it finishes: `0` means success, anything else
+means failure. `echo $?` prints the last one. `&&`, `set -e` in scripts, systemd and CI all decide
+"did it work?" from this number alone, so it's worth knowing it exists from day one.
+
+### 0.6 Words you'll meet
+
+| Term | Short meaning |
+|---|---|
+| Server / host / box | A computer that runs software for other computers. Here: a Linux VM in Oracle's cloud |
+| VM | Virtual machine: a computer simulated in software on someone else's hardware |
+| Process | A running program. `ps aux` lists them; each has a number, the PID |
+| Service / daemon | A process that runs in the background with no terminal, usually started at boot |
+| Port | A number (0–65535) that picks *which* program on a machine gets the network traffic. SSH 22, HTTP 80, HTTPS 443, PostgreSQL 5432, Redis 6379 |
+| Environment variable | A named setting a process receives when it starts (`PORT=3000`). This is how you configure an app without changing its code |
+| Backing service | Something the app needs but doesn't contain: a database, a cache, a queue |
+| CI | Continuous Integration: a robot that runs lint and tests on every change |
+| Runbook | Step-by-step instructions for an operations task, written so someone else (or you, tired, at 3 a.m.) can follow them |
+| Idempotent | Safe to run twice: the second run changes nothing. A goal for every script and runbook step |
+
 ---
 
 ## Step 1 — Work like a team from the first commit (30 min)
+
+> **📘 Learn: commits, branches, pull requests**
+>
+> - A **commit** is a snapshot of the whole project, plus a message, an author and a pointer to
+>   the previous commit. A **branch** is only a movable label that points at a commit. `main` is
+>   the branch everyone agrees is the truth.
+> - A **pull request (PR)** is a GitHub page that says "please merge branch X into `main`". It
+>   shows the diff, runs automatic checks (CI) and collects reviews. Teamwork and quality control
+>   happen there.
+> - **Trunk-based development:** everyone branches off `main`, keeps branches small, and merges back
+>   within a day or two. (You'll compare it with the alternative, GitFlow, in Step 6.1.)
+> - **Squash merge** turns all the commits in a PR into one commit on `main`.
+> - Why bother when you work alone? In Step 7, `main` will reject direct pushes. In later stages,
+>   whatever lands on `main` gets deployed. Practising the habit now costs nothing.
 
 Branch protection comes in Step 7, but start the habit now: **never commit to `main`**. Every
 step below is a short-lived branch that ends in a pull request.
@@ -92,6 +146,19 @@ Naming convention used in this guide: `feat/…`, `fix/…`, `docs/…`, `chore/
 ---
 
 ## Step 2 — Read the handover like an auditor (1.5–2 h)
+
+> **📘 Learn: why Git never forgets**
+>
+> - Git keeps every version of every file that was ever committed. Deleting a file just makes a
+>   *new* commit in which the file is missing. The old commits still contain it, and anyone can
+>   bring them back with `git show`.
+> - So a secret committed even once must be treated as **leaked**. The real fix is to **rotate**
+>   it: create a new credential and revoke the old one. Rewriting history is cleanup, not the fix.
+>   You'll do both in Stage 7. Keep this in mind for the "private repo" question in 2.2.
+> - A **secret scanner** (gitleaks, GitHub secret scanning) searches every commit for text that
+>   looks like a key or password. Teams run one in CI so leaks are caught before they merge.
+> - "Read like an auditor" means: trust nothing you haven't seen evidence for, and write down the
+>   evidence (file + line) next to every worry.
 
 Before running anything, read what the dev team gave you. Keep a scratch list called
 "things that worry me": it becomes your risk register in Step 3.
@@ -140,6 +207,19 @@ gitleaks git -v        # scans the whole history
 
 ## Step 3 — Write the risk register (1.5 h) → checkpoint C5
 
+> **📘 Learn: what a risk register is**
+>
+> A risk register is a table of things that could go wrong. Each row has the evidence, how likely
+> it is, how bad it would be, and what you'll do about it. It turns a vague "this server scares
+> me" into a prioritised to-do list that a manager can read in two minutes.
+>
+> - **A risk is not a bug.** A bug is broken now. A risk is a *chance* of harm: "no backups" isn't
+>   broken today, it's a bad day waiting to happen.
+> - **Likelihood × Impact** is a rough score so you can sort the list. The numbers are judgement,
+>   not science. What makes them credible is the Evidence column.
+> - **Be specific enough to act on.** "Security is weak" is useless. "Root can log in over SSH with
+>   a password" is a task with a clear fix.
+
 Create `docs/risk-register.md` with this structure:
 
 ```markdown
@@ -187,7 +267,35 @@ You already have Node 22, PostgreSQL 17 and Redis running on Windows. The point 
 without containers is to see exactly what the containers will later replace: three processes,
 two backing services and a handful of environment variables.
 
+> **📘 Learn: what you're about to run**
+>
+> - **The parts.** *api*: answers HTTP requests. *worker*: takes background jobs from a queue, so
+>   slow work doesn't make HTTP requests wait. *web*: the pages customers see. *PostgreSQL*: the
+>   database, the data you must never lose. *Redis*: a fast in-memory store, used here as the job
+>   queue between the api and the worker.
+> - **Configuration through environment variables.** The app reads its settings (database address,
+>   port, keys) from environment variables, not from code. That's the "config" rule of the
+>   *Twelve-Factor App* (12factor.net, worth 20 minutes): the same code runs everywhere, and only
+>   the settings change. A `.env` file is a development convenience that loads those variables. It
+>   is never committed. `.env.example` is the committed template, with fake values.
+> - **Connection URLs** look like `postgres://user:password@host:port/database`. A typo in any part
+>   is the most common reason an app won't start.
+> - **Lockfile.** `package-lock.json` records the exact version of every dependency, and of their
+>   dependencies. In 4.3 you'll find out how `npm ci` and `npm install` treat it differently.
+> - **Unit vs integration tests.** Unit tests check one piece of code on its own, with no database
+>   or network. Integration tests check the pieces working together against a real database and
+>   Redis. That's why you must know *which* database they'll touch (4.5).
+> - **Health endpoints.** Load balancers, Docker and Kubernetes regularly call a URL on your app to
+>   decide two things: should traffic go to it, and should it be restarted? The contract in PDF §3
+>   defines two endpoints, `/healthz` and `/readyz`, with different jobs. Read it before 4.6.
+
 ### 4.1 Create a dedicated database user (not the superuser)
+
+> **📘 Learn:** in PostgreSQL a **role** is a user account, and a **database** is a separate set of
+> tables owned by a role. The `postgres` role is the **superuser**: it can read, change or drop
+> anything on the server. An app should connect with a role that owns only its own database
+> (**least privilege**). Then a bug or a stolen password can only damage that one database.
+> `psql` is the command-line client: `\l` lists databases, `\du` lists roles, `\q` quits.
 
 ```powershell
 # laptop · PowerShell
@@ -350,6 +458,18 @@ Redis back.
 
 ## Step 5 — A Makefile for everyday commands (1 h) → requirement 7
 
+> **📘 Learn: Make and linters**
+>
+> - **Make** is a build tool from 1976 that DevOps teams still use as a *menu of commands*.
+>   `make test` is easier to remember than `cd app/api && npm test`, and it works the same on every
+>   laptop and in CI. A Makefile is a list of **targets**. Each target is one line,
+>   `name: prerequisites`, followed by indented **recipe** lines, which are shell commands.
+>   `make check` first runs the targets `check` depends on (`lint`, `test`), then its own recipe.
+>   Every recipe line runs in a fresh shell, which is why each line starts with its own `cd`.
+> - A **linter** (here ESLint) reads code *without running it* and flags likely mistakes: unused
+>   variables, misspelled names, unreachable code. It's cheap enough to run on every PR, and it
+>   catches some bugs before the tests do.
+
 `make` isn't installed on Windows. Pick one option:
 
 - **Git Bash + make:** `winget install ezwinports.make`, then reopen Git Bash.
@@ -446,6 +566,24 @@ Questions for your log:
 ---
 
 ## Step 6 — Repository governance files (1.5 h) → requirement 1
+
+> **📘 Learn: the files that turn a repo into a team repo**
+>
+> | File | What it does |
+> |---|---|
+> | `docs/branching-strategy.md` | The written rules: how branches are named, and how code reaches `main` and production |
+> | `.gitignore` | Patterns for files Git should never offer to commit: dependencies, secrets, build output |
+> | `.github/pull_request_template.md` | GitHub pre-fills every new PR with it, so every PR answers the same questions |
+> | `.github/CODEOWNERS` | Maps paths to people. GitHub automatically asks them to review when those files change |
+> | `.github/workflows/*.yml` | GitHub Actions: CI jobs that run on events such as a push or a PR |
+>
+> **GitHub Actions in five sentences.** A **workflow** is a YAML file that starts on an **event**
+> (`on: pull_request`). It contains **jobs**, and each job runs on a fresh, throwaway **runner** VM
+> (`runs-on: ubuntu-24.04`). A job is a list of **steps**. A step is either a shell command
+> (`run:`) or a reusable **action** (`uses: actions/checkout@v4` clones your repo onto the runner).
+> If any step exits non-zero, the job fails and the PR shows a red ✗.
+>
+> YAML tip: indentation is meaningful, and it must be spaces, never tabs (the opposite of Make).
 
 Use one branch for all of these:
 
@@ -594,6 +732,12 @@ before you continue, so if it fails, go back to Step 4.5.
 
 ## Step 7 — Protect `main` (30 min) → checkpoint C1
 
+> **📘 Learn: branch protection.** These are rules GitHub enforces *on its servers*, whatever
+> anyone's laptop does. For example: "nobody pushes to `main` directly; changes arrive only through
+> PRs, and only after check X is green." **Rulesets** are the newer form of branch protection rules.
+> A rule that isn't enforced is just a suggestion. This step turns your Step 1 habit into a
+> guarantee.
+
 ### 7.1 A plan limitation you need to know about
 
 On **GitHub Free**, branch protection and rulesets are only *enforced* on **public**
@@ -638,68 +782,196 @@ that PR without merging. Screenshot both results for your evidence folder (`docs
 
 ---
 
-## Step 8 — A server you can trust (2–3 h) → checkpoint C3
+## Step 8 — A server you can trust, on Oracle Cloud (3–4 h) → checkpoint C3
 
-### 8.1 Choose where the server runs
+> **📘 Learn: the cloud pieces you're about to click**
+>
+> - **Region:** a city-level group of data centres (Mumbai, Singapore). **Availability domain:** one
+>   data centre, or a group of them, inside a region.
+> - **VCN** (Virtual Cloud Network; AWS calls it a VPC): your own private network in the cloud.
+>   A **subnet** is a slice of its IP range. A **public** subnet has a route to the internet through
+>   an **internet gateway**.
+> - **Instance / shape / image:** the VM itself, its size (CPU + RAM), and the operating system it
+>   boots from.
+> - **Private vs public IP:** the private IP (`10.x.x.x`) only works inside the VCN. The public IP is
+>   how the internet reaches you.
+> - **Security list:** a firewall Oracle applies *outside* the VM, on the network. The VM also has
+>   its own firewall *inside* it (8.9).
 
-| Option | Cost | Pros | Cons |
-|---|---|---|---|
-| **Budget VPS** (Hetzner, DigitalOcean, Vultr…), Ubuntu 24.04, 2 vCPU / 2–4 GB | ~US$4–8/month | Real public IP; Stage 3 (domain + TLS) needs one anyway | Costs money; mistakes are exposed to the internet |
-| **Local VM** (VirtualBox + Ubuntu Server 24.04 ISO) | free | Snapshots let you undo; safe to break | Needs ~4 GB RAM free; no public IP until Stage 3 |
-| **WSL Ubuntu** (you have it) | free | Already installed | Not a real server: it doesn't boot like one, has no real SSH exposure, and "reboot" means `wsl --shutdown`. Fine for practising commands, **weak evidence** for the checkpoints. |
+### 8.1 Where the server runs: Oracle Cloud Always Free
 
-Recommendation: a **local VirtualBox VM** for Stages 1–2 (snapshot before every risky step), then a
-VPS from Stage 3. If you can afford a VPS now, using it from day 1 is also fine.
+You're using **one Oracle Cloud Always Free Arm VM** (Ubuntu 24.04) for this stage. It's a real
+server with a public IP, so mistakes are real too. Three things are different from a plain VPS:
 
-For a VirtualBox VM: Windows Home has no Hyper-V, so install VirtualBox. Create a 2 vCPU / 2 GB /
-20 GB VM, use a **NAT** adapter, and add a port-forwarding rule: host `127.0.0.1:2222` → guest
-`22`. During the Ubuntu install, tick **Install OpenSSH server**.
+| Difference | What it means for you |
+|---|---|
+| **Arm CPU** (Ampere A1) | Irrelevant in Stage 1. From Stage 2, images must be built for `arm64`. |
+| **Two firewalls** | Oracle's *security list* (in the cloud) **and** `iptables` rules on the VM. A port is open only if both allow it. |
+| **Serial console** | A way in that doesn't use SSH. It's your safety net if you break `sshd`. |
 
-### 8.2 Create your SSH key (laptop)
+Alternatives, if Oracle doesn't work out: a budget VPS (Hetzner or DigitalOcean, US$4–8 a month)
+or a local VirtualBox VM. The steps from 8.6 on are almost identical everywhere.
+
+### 8.2 Create your SSH key first (laptop)
+
+> **📘 Learn: SSH and its two kinds of keys**
+>
+> - **SSH** gives you an encrypted terminal on a remote machine. `ssh` is the client on your laptop;
+>   `sshd` is the server program on the VM.
+> - **Your user key pair** proves *who you are*. The public half (`id_ed25519.pub`) goes on the
+>   server, in `~/.ssh/authorized_keys`. The private half (`id_ed25519`) never leaves your laptop.
+>   To log in, the server sends a challenge that only the private key can sign, so no password
+>   ever crosses the network.
+> - The **passphrase** encrypts the private key file on your disk. A stolen laptop then doesn't
+>   mean a stolen server.
+> - The **host key pair** belongs to the server and proves *which machine* you reached. Your laptop
+>   remembers it in `~/.ssh/known_hosts` after the first connection. (8.6 asks you why the first
+>   connection deserves care.)
+> - `ed25519` is the key algorithm: modern, short and fast. Prefer it over RSA for new keys.
+
+Oracle asks for your public key when it creates the VM, so make it now.
 
 ```powershell
 # laptop · PowerShell
 ssh-keygen -t ed25519 -C "rupak@laptop"     # accept the path, SET A PASSPHRASE
-Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
+Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub   # one line, starts with ssh-ed25519. You'll paste it in 8.5
+```
+
+The **public** key (`.pub`) goes to Oracle. The private key (`id_ed25519`, no extension) never
+leaves your laptop.
+
+### 8.3 Sign up and lock down the Oracle account
+
+1. Go to **cloud.oracle.com → Sign up**. A card is needed for identity checks. The Always Free tier
+   doesn't charge it.
+2. **Home region:** pick **India West (Mumbai)**, **India South (Hyderabad)** or **Singapore**.
+   This choice is **permanent**, and Always Free compute only runs in your home region.
+3. **MFA on your Oracle login.** Oracle usually prompts you to enrol on first sign-in. If it
+   doesn't, find it under your profile or the Identity & Security settings. Whoever controls this
+   account controls every server in it, so this account is the new "root password on a sticky
+   note" (R-16).
+4. **Check your real Arm allowance.** Menu → *Governance & Administration* → *Limits, Quotas and
+   Usage* → service **Compute**. Search for `A1`. Write the core and memory limits in your learning
+   log, because they changed in 2026 and your number is the one that counts.
+5. **Budget alert.** Menu → *Billing & Cost Management* → *Budgets* → *Create budget*: amount
+   **US$1**, with an alert on *actual* spend. If anything ever costs money by mistake, you find out
+   that day, not at the end of the month.
+
+### 8.4 Network: a VCN with a public subnet
+
+Menu → *Networking* → *Virtual cloud networks* → **Start VCN Wizard** → *Create VCN with Internet
+Connectivity*. Name it `tp-vcn`, keep the defaults, and click **Create**.
+
+Then open `tp-vcn` → *Subnets* → the **public** subnet → its **Default Security List** and read the
+ingress rules. You should see TCP 22 from `0.0.0.0/0`, plus some ICMP. Leave them. Your home IP
+probably changes, so restricting port 22 to it would lock you out. Key-only SSH is the protection
+(8.8).
+
+Log question: *A security list and a host firewall both filter traffic. What can each one see or do
+that the other can't?*
+
+### 8.5 Create the VM
+
+Menu → *Compute* → *Instances* → **Create instance**:
+
+| Field | Value |
+|---|---|
+| Name | `tp-stage1` (it also becomes the default hostname) |
+| Placement | default availability domain |
+| Image | *Change image* → Ubuntu → **Canonical Ubuntu 24.04** (not "Minimal") |
+| Shape | *Change shape* → Ampere → **VM.Standard.A1.Flex**, **1 OCPU, 6 GB** (keep the rest of your allowance for Stages 9–10) |
+| Networking | `tp-vcn`, the **public** subnet, *Automatically assign public IPv4 address*: **yes** |
+| SSH keys | *Paste public keys* → paste the line from 8.2 |
+| Boot volume | default size is fine |
+
+Click **Create**, wait for **RUNNING**, and copy the **Public IP address**.
+
+<details><summary>"Out of host capacity"?</summary>
+
+The free Arm machines are popular. Try another availability domain, or try again at a quiet time
+(early morning, your time). If you're stuck for days, the small AMD shape
+`VM.Standard.E2.1.Micro` (1 GB, x86) is enough for Stage 1, but plan to move to Arm before Stage 2.
+
+</details>
+
+### 8.6 First login, and your personal admin user
+
+> **📘 Learn: Linux users and sudo**
+>
+> - **root** (user id 0) can do anything on the machine. Normal users can't change system files.
+> - **sudo** lets a user in the `sudo` group run *one* command as root, after typing *their own*
+>   password, and it logs who ran what. A shared root password gives you none of that: you can't
+>   tell who did something, and you can't remove one person's access without changing it for all.
+> - `adduser` creates a person's account. `usermod -aG sudo rupak` **a**ppends the user to the
+>   sudo **G**roup. `install -d -m 700 -o rupak` creates a directory with a given mode (permission
+>   bits) and owner in one command.
+> - `apt` is Ubuntu's package manager. `apt update` refreshes the list of available packages;
+>   `apt full-upgrade` installs the new versions, including security fixes.
+
+**Verify the host key, don't just trust it.** On the instance page, open *Console history* →
+*Capture console history*, and look for the block `BEGIN SSH HOST KEY FINGERPRINTS`. That's the
+VM telling you its fingerprint through a channel an attacker can't sit in. Now connect:
+
+```powershell
+# laptop · PowerShell
+ssh ubuntu@<PUBLIC_IP>
+```
+
+Compare the `ED25519` fingerprint SSH shows you with the one from the console before you type
+`yes`. Write down what that comparison protects you from. That's "Prove you understand" Q3.
+
+```bash
+# server (as ubuntu)
+sudo apt update && sudo apt full-upgrade -y
+sudo adduser rupak                 # set a password: used for sudo and the serial console, never for SSH
+sudo usermod -aG sudo rupak
+sudo install -d -m 700 -o rupak -g rupak /home/rupak/.ssh
+sudo install -m 600 -o rupak -g rupak ~/.ssh/authorized_keys /home/rupak/.ssh/authorized_keys
+[ -f /var/run/reboot-required ] && sudo reboot      # a new kernel needs a reboot
 ```
 
 Create `C:\Users\HP\.ssh\config` so you can type `ssh tp`:
 
 ```
 Host tp
-    HostName 127.0.0.1        # VPS: its public IP
-    Port 2222                 # VPS: 22
+    HostName <PUBLIC_IP>
     User rupak
     IdentityFile ~/.ssh/id_ed25519
     IdentitiesOnly yes
 ```
 
-### 8.3 First login: create your personal admin user
-
-```bash
-# server (first login: as root on a VPS, or as the installer user on a VM)
-sudo apt update && sudo apt full-upgrade -y
-sudo adduser rupak                 # set a password: used for sudo only, never for SSH
-sudo usermod -aG sudo rupak
-```
-
-Copy your public key to the new user:
-
 ```powershell
-# laptop · PowerShell   (VM example; for a VPS use: ssh root@<IP> -p 22 ...)
-Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh -p 2222 rupak@127.0.0.1 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+# laptop · PowerShell
+ssh tp                    # asks for the key passphrase, not the account password
+```
+```bash
+# server (as rupak)
+sudo whoami               # asks for rupak's password, then prints: root
 ```
 
-Now `ssh tp` should log you in **with the key**: it asks for the key passphrase, not the account
-password. **Do not continue until this works.**
+**Do not continue until both work.**
 
-### 8.4 Harden SSH, without locking yourself out
+### 8.7 Your safety net: the serial console (before you touch `sshd`)
+
+Instance page → *Resources* → **Console connection** → **Launch Cloud Shell connection**. A
+terminal opens in the browser. Press **Enter** until you see a `login:` prompt, then log in as
+`rupak` with the password from 8.6. Type `exit` and close it.
+
+That worked without SSH, which is the point. The console is a virtual serial port wired straight
+into the VM, so a broken `sshd_config` or firewall rule can't block it. It **does** need a user with
+a password, so never lock or delete `rupak`'s password.
+
+### 8.8 Harden SSH, without locking yourself out
 
 **Golden rule:** keep one SSH session open the whole time, and test changes in a **second**
-session.
+session. The serial console (8.7) is your last resort.
+
+Oracle's image already blocks password logins, and root's `authorized_keys` just prints "Please
+login as the user ubuntu". So why write your own config? Because a default you didn't choose isn't
+a decision. Your file states the intent, survives image changes, and adds `AllowUsers`.
 
 ```bash
-# server
+# server (as rupak)
 sudo tee /etc/ssh/sshd_config.d/10-hardening.conf > /dev/null <<'EOF'
 # TrackPoint SSH hardening (SEC-01)
 PermitRootLogin no
@@ -719,52 +991,145 @@ sudo systemctl restart ssh
 ```
 
 Why the `10-` prefix? `sshd` uses the **first** value it reads for most settings, and it reads
-the `sshd_config.d/*.conf` files in alphabetical order. Some cloud images ship
-`50-cloud-init.conf` with `PasswordAuthentication yes`, and `10-` beats it. The `sshd -T` output
-shows the *effective* values, so check that it's what you expect.
+`sshd_config.d/*.conf` in alphabetical order. Cloud images often ship `50-cloud-init.conf`, and `10-`
+beats it. `sshd -T` shows the *effective* values.
 
-### 8.5 Hostname, timezone, time sync
+Now open a **second** terminal, run `ssh tp`, and check it works. Then retire the default `ubuntu`
+account. It's a shared, well-known username with passwordless sudo:
+
+```bash
+# server (as rupak, from the second session)
+sudo cat /etc/sudoers.d/90-cloud-init-users     # read it: who gets sudo WITHOUT a password?
+sudo deluser --remove-home ubuntu
+sudo rm /etc/sudoers.d/90-cloud-init-users      # only if it mentioned ubuntu and nothing else
+sudo visudo -c                                  # sudo config still valid?
+```
+
+### 8.9 The two firewalls
+
+> **📘 Learn: how a Linux firewall works.** A firewall decides which network packets may come in
+> or go out. On Linux the kernel does the filtering itself (*netfilter*). `iptables`, `nftables` and
+> `ufw` are only different tools for writing its rules. Rules are checked from top to bottom and the
+> **first match wins**, so a final "REJECT everything else" catches whatever wasn't explicitly
+> allowed above it. That pattern is called **default deny**: list what is allowed, refuse the rest.
+
+Look at what Oracle put on the VM:
 
 ```bash
 # server
+sudo iptables -L INPUT -n -v --line-numbers
+sudo cat /etc/iptables/rules.v4
+```
+
+You should see roughly: accept established traffic, accept ICMP and loopback, **accept TCP 22**, and
+then **REJECT everything else**. You'll also see rules mentioning `169.254.0.0/16`. **Never delete
+those.** They're how the VM reaches Oracle's metadata service, DNS, time and storage.
+
+Rules for this stage:
+
+- **Don't enable `ufw`.** It writes to the same tables as Oracle's rules, and two tools managing one
+  firewall is how ports end up mysteriously open or closed. The brief schedules the host-firewall
+  work for Stage 7, and in Stage 3 you'll open 80 and 443 in **both** layers.
+- Nothing else needs to be reachable now. The API will listen on `127.0.0.1` (Step 9).
+
+Experiment for the log:
+
+```powershell
+# laptop · PowerShell
+Test-NetConnection <PUBLIC_IP> -Port 22      # TcpTestSucceeded : True
+Test-NetConnection <PUBLIC_IP> -Port 5432    # False. Which layer(s) blocked it? How could you tell?
+```
+
+### 8.10 Hostname, timezone, time sync
+
+> **📘 Learn:** **cloud-init** is the program that sets up a cloud VM when it first boots. It creates
+> the default user, installs your SSH key and sets the hostname. Some of its modules run again at
+> *every* boot, and that's how it can quietly undo your changes. **NTP** keeps the clock right by
+> asking time servers. Correct time matters for logs, TLS certificates and anything else that
+> compares timestamps between machines.
+
+On a cloud image, **cloud-init** may reset the hostname and `/etc/hosts` at every boot. Tell it not
+to:
+
+```bash
+# server
+sudo tee /etc/cloud/cloud.cfg.d/99-trackpoint.cfg > /dev/null <<'EOF'
+preserve_hostname: true
+manage_etc_hosts: false
+EOF
+
 sudo hostnamectl set-hostname tp-stage1
-sudo sed -i 's/^127\.0\.1\.1.*/127.0.1.1 tp-stage1/' /etc/hosts
+grep -q 'tp-stage1' /etc/hosts || echo '127.0.1.1 tp-stage1' | sudo tee -a /etc/hosts
 sudo timedatectl set-timezone UTC
-timedatectl                       # look for: Time zone UTC, "System clock synchronized: yes", "NTP service: active"
-timedatectl timesync-status       # which NTP server, and how far off the clock is
+timedatectl                 # look for: Time zone UTC, "System clock synchronized: yes", "NTP service: active"
+timedatectl timesync-status 2>/dev/null || chronyc tracking    # which tool syncs the clock on this image, and how far off it is
 ```
 
 Why UTC on servers? Write the answer in your log, connecting it to what you found in Step 4.5.
 
-### 8.6 Prove C3 from a second terminal
+### 8.11 Prove C3 from a second terminal
 
 ```powershell
 # laptop · PowerShell
-ssh -p 2222 root@127.0.0.1                                                          # expect: Permission denied (publickey)
-ssh -p 2222 -o PubkeyAuthentication=no -o PreferredAuthentications=password rupak@127.0.0.1   # expect: Permission denied (publickey)
-ssh tp "whoami; hostname"                                                           # expect: rupak / tp-stage1
+ssh root@<PUBLIC_IP>                                                                  # expect: Permission denied (publickey)
+ssh -o PubkeyAuthentication=no -o PreferredAuthentications=password rupak@<PUBLIC_IP>  # expect: Permission denied (publickey)
+ssh ubuntu@<PUBLIC_IP>                                                                # expect: Permission denied (publickey)
+ssh tp "whoami; hostname"                                                             # expect: rupak / tp-stage1
 ```
 
-Save the three outputs to `docs/evidence/stage1/ssh-checks.txt`. Then read the server's auth log
-to see the rejected attempts from the server's side:
+Save the outputs to `docs/evidence/stage1/ssh-checks.txt`. Then reboot once (`sudo reboot`) and
+check `ssh tp hostname` still says `tp-stage1`. That proves the cloud-init change worked.
+
+Now look at the server's side. Your VM has been on the internet for an hour or two:
 
 ```bash
 # server
-sudo journalctl -u ssh --since "10 min ago" --no-pager | tail -20
+sudo journalctl -u ssh --since "24 hours ago" --no-pager | grep -c "Invalid user"
+sudo journalctl -u ssh --since "24 hours ago" --no-pager | grep -oP 'Invalid user \K\S+' | sort | uniq -c | sort -rn | head
 ```
 
-> Brute-force protection (fail2ban) and the host firewall are SEC-01/SEC-02, scheduled for
-> Stage 7. On a **VPS**, consider at least restricting port 22 in the provider's firewall now.
+Those are bots guessing usernames, and probably passwords. Write a log entry connecting this to
+risk R-01 on the legacy box (root + password on port 22). Your register's likelihood score of 5 now
+has evidence behind it.
 
-### 8.7 Write it down as you go (the "everything is code" rule)
+### 8.12 Keep it alive, keep it free
+
+- **Stop vs terminate.** *Reboot* and *Stop* keep the disk and the public IP. *Terminate* deletes
+  the VM and its IP (and the disk too, if you tick that box). In Stage 3 you'll switch to a
+  **reserved** public IP so DNS doesn't break when you rebuild.
+- **Idle reclaim.** Oracle may stop Always Free VMs that stay almost idle for about a week. You have
+  two options: upgrade the account to *Pay As You Go* (free resources stay free; your US$1 budget
+  alert from 8.3 is the guard), or accept it and **rebuild from your runbook**, which is exactly
+  what Step 13 asks you to practise anyway.
+- **Check the bill** once a week: *Billing & Cost Management* → *Cost analysis* should show
+  US$0.00.
+
+### 8.13 Write it down as you go (the "everything is code" rule)
 
 Copy every server command you run into `docs/runbooks/server-setup.md` in order, with a short
-reason for each. In Step 13 you'll rebuild the server by following that file literally. Ansible
-replaces it in Stage 5.
+reason for each. Include the **console clicks** from 8.3–8.5 as numbered steps too. In Step 13
+you'll rebuild the server by following that file literally. In Stage 5, Terraform (the Oracle
+provider) replaces the clicks, and Ansible replaces the commands.
 
 ---
 
 ## Step 9 — Run the API under systemd (2–3 h) → checkpoint C4
+
+> **📘 Learn: systemd**
+>
+> - **systemd** is the first process Linux starts (PID 1). It starts everything else, and keeps
+>   watching it.
+> - It manages **units**. A `.service` unit describes one program: what to run (`ExecStart=`), as
+>   which user, with which environment, and what to do when it exits (`Restart=`).
+> - A unit file has three sections. `[Unit]`: description, and ordering against other units
+>   (`After=`, `Wants=`). `[Service]`: how to run the program. `[Install]`: when it should start at
+>   boot (`WantedBy=multi-user.target` roughly means "a normal boot").
+> - `systemctl start` runs it now. `systemctl enable` makes it start at every boot. `enable --now`
+>   does both. After editing a unit file, run `systemctl daemon-reload` so systemd re-reads it.
+> - Everything the service prints to stdout/stderr goes to the **journal**. Read it with
+>   `journalctl -u <name>`. No log files to manage.
+> - The **hardening** lines (`ProtectSystem=`, `NoNewPrivileges=`, …) put the service in a sandbox.
+>   Each line takes away something the app shouldn't need. `man systemd.exec` explains each one.
 
 ### 9.1 Install the runtime and backing services
 
@@ -797,6 +1162,17 @@ sudo -u postgres psql -c "CREATE ROLE trackpoint LOGIN PASSWORD '$DBPASS';" \
 (Stage 3 splits this into migration, app and read-only roles; SEC-06.)
 
 ### 9.3 A dedicated system user, and the code
+
+> **📘 Learn: file ownership and permissions**
+>
+> `ls -l` prints something like `-rw-r----- 1 root trackpoint 512 api.env`. That file is owned by
+> user **root** and group **trackpoint**. The nine letters are three sets of **r**ead / **w**rite /
+> e**x**ecute: for the owner, for the group, and for everyone else. In numbers r=4, w=2, x=1, so
+> `640` means owner rw (6), group r (4), others nothing (0). On a *directory*, `x` means "may
+> enter it". `chown` changes the owner, `chmod` changes the bits.
+>
+> A **system user** (`useradd --system`) exists only to run one service: it has no password, no
+> home directory and no login shell (`/usr/sbin/nologin`).
 
 ```bash
 # server
@@ -951,6 +1327,19 @@ blocks you there is worth a learning-log entry.
 
 ## Step 10 — Server inventory, produced by commands (1 h) → checkpoint C6
 
+> **📘 Learn: listening sockets and bind addresses**
+>
+> A server program **listens** on an address and a port, waiting for connections. The address
+> decides who can connect:
+>
+> - `127.0.0.1` (*localhost*, the loopback interface): only programs on the same machine.
+> - `0.0.0.0` (shown as `*`, or `[::]` for IPv6): every network interface. Anyone who can reach the
+>   machine can connect, if the firewalls let them through.
+>
+> `ss -tulpn` lists them: **t**cp, **u**dp, **l**istening only, the owning **p**rocess, **n**umbers
+> instead of names. An inventory produced by a script is better than one typed by hand: you can
+> run it again tomorrow and `diff` the two.
+
 Add `scripts/server-inventory.sh` to the repo:
 
 ```bash
@@ -997,7 +1386,7 @@ Then, **by hand**, add a section at the top of `docs/server-inventory.md`:
 ## What each listening port is, and why it's there
 | Port | Process | Bound to | Reachable from | Why it exists |
 |------|---------|----------|----------------|---------------|
-| 22   | sshd    | 0.0.0.0  | anywhere (VM: only via NAT forward) | admin access |
+| 22   | sshd    | 0.0.0.0  | anywhere (Oracle security list + iptables allow only 22) | admin access |
 | ...  |         |          |                |               |
 ```
 
@@ -1009,9 +1398,21 @@ Every row must be explainable. "I don't know what this is" means investigate it
 
 ## Step 11 — Break it on purpose (2 h)
 
-For each experiment, add a learning-log entry: **expected → actual → why**. Snapshot the VM first.
+For each experiment, add a learning-log entry: **expected → actual → why**. Take a boot-volume backup first (instance page → *Boot volume* → *Boot volume backups* → *Create*; Always Free includes a few).
+
+> **📘 Learn: why break things on purpose?** Outages always arrive at a bad time. If the first time
+> you see "No space left on device" is during a real incident, you're learning under pressure. If
+> you've already caused it yourself on a test box, you recognise it in seconds. Each experiment is a
+> small controlled outage: predict, break, observe, explain.
 
 ### 11.1 Signals and systemd
+
+> **📘 Learn: signals.** A **signal** is a short message the kernel delivers to a process.
+> `SIGTERM` means "please shut down" (it's what `kill` sends by default, and what `systemctl stop`
+> sends first). `SIGINT` is what Ctrl+C sends. `SIGKILL` ends the process immediately; the process
+> can't catch it, so it gets no chance to clean up. Programs can install **handlers** for TERM and
+> INT to finish in-flight work before exiting. When a process ends, systemd records *how*: a normal
+> exit with an exit code, or killed by a signal. `Restart=` decides what to do based on that.
 
 ```bash
 # server
@@ -1045,7 +1446,12 @@ Why?
 
 ### 11.3 A full disk
 
-Don't fill your root disk (unless it's a throwaway VM snapshot). Use a small test partition:
+> **📘 Learn: mounting.** Linux has one directory tree, starting at `/`. A disk or partition gets
+> attached ("**mounted**") at a directory, and its files then appear under that directory. `df -h`
+> shows each mounted filesystem and how full it is. A **loop device** lets an ordinary file act like
+> a disk. That's how the commands below create a tiny 100 MB disk you can fill safely.
+
+Don't fill your root disk (unless you have a fresh boot-volume backup to restore). Use a small test partition:
 
 ```bash
 # server
@@ -1068,7 +1474,7 @@ Observe what breaks first, and how it fails: a loud error, or silently? Clean up
 sudo umount /mnt/small && sudo rm /var/tmp/small.img
 ```
 
-Revert whatever you re-pointed, too. **Optional:** on a throwaway snapshot only, fill `/` with
+Revert whatever you re-pointed, too. **Optional:** only with a fresh boot-volume backup, fill `/` with
 `fallocate -l <size> /bigfile` and see which service complains first: PostgreSQL, journald or SSH.
 
 ### 11.4 Port already in use
@@ -1087,6 +1493,12 @@ kill %1; sudo systemctl reset-failed trackpoint-api; sudo systemctl start trackp
 What did `StartLimitBurst` do here?
 
 ### 11.5 Merge conflicts, and rebase versus merge
+
+> **📘 Learn: the vocabulary.** Both commands combine work from two branches. A **merge** creates
+> a new commit with two parents that joins the two histories. A **rebase** takes your branch's
+> commits and replays them one by one on top of another branch. A **conflict** happens when both
+> sides changed the same lines. Git stops, marks the file with `<<<<<<<`, `=======` and `>>>>>>>`,
+> and waits for you to choose. You'll see for yourself what each one does to the graph.
 
 Practise in a throwaway clone, so your real repo stays clean:
 
@@ -1134,8 +1546,15 @@ your experiments). If you can't answer one without searching, the stage isn't fi
 
 "At the end of each stage, destroy what you built and recreate it from the repository."
 
+> **📘 Learn: why destroy and rebuild?** A server set up by hand slowly becomes a **snowflake**:
+> unique, and impossible to recreate, because nobody remembers every change made to it. Modern
+> teams treat servers as replaceable ("cattle, not pets"). The *instructions* are the real asset,
+> and any single server can be thrown away. A runbook you've never followed from scratch is only a
+> guess; rebuilding is how you test it. In Stage 5, Terraform and Ansible turn this runbook into
+> code.
+
 1. Make sure `docs/runbooks/server-setup.md` contains every command from Steps 8 and 9, in order.
-2. Destroy the server: delete the VM (or rebuild the VPS from a fresh image).
+2. Destroy the server: terminate the Oracle instance (tick *Permanently delete the attached boot volume*), then recreate it following your runbook, console clicks included.
 3. Start a timer. Follow the runbook **literally**, copy-pasting from it and never from memory.
 4. Every time the runbook is wrong or missing something, stop, fix the runbook, and continue.
 5. Record the total time and the number of runbook fixes in the progress tracker.
