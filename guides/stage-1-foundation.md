@@ -372,6 +372,35 @@ your Stage 2 network diagram.
 
 ### 4.5 Run the tests
 
+> **📘 Learn: automated tests**
+>
+> - `npm test` runs whatever command is under `"scripts" → "test"` in `package.json`. Open the file
+>   and see which **test runner** it uses. The runner finds the test files, runs each test and
+>   prints ✔ or ✖ for each one. If any test fails, it exits non-zero (§0.5), and that exit code is
+>   how CI knows to go red.
+> - Most tests are built around an **assertion**: "I expect this value to equal that one." When it
+>   fails, the runner prints **expected** (what the test wanted) and **actual** (what the code
+>   produced). Read those two lines before anything else. The difference between them is your
+>   first clue.
+> - **"Works on my machine."** A test runs on a particular computer, with its own clock, timezone,
+>   language settings, OS and installed versions. If the code depends on any of these without
+>   saying so, the same test can pass on one machine and fail on another. CI runners, containers
+>   and servers are different machines from the developer's laptop.
+> - A **flaky test** passes sometimes and fails other times, with no code change in between. The
+>   usual causes are timing, order, or shared state (two things using the same data at the same
+>   time). Flaky tests are dangerous because people learn to ignore red, and then they also ignore
+>   it when it's real.
+> - **Integration tests often reset data.** To start from a known state, many suites delete or
+>   truncate tables and flush Redis before they run. Pointed at the wrong database, a correct test
+>   suite becomes a data-loss tool. That's why you read before you run.
+> - **Redis database numbers.** One Redis server has 16 separate databases, numbered 0–15. The
+>   number at the end of the URL picks one: `redis://localhost:6379/1` is DB 1, and with no number
+>   you get DB 0. Using DB 1 for tests keeps them away from your dev data in DB 0.
+> - **`$env:NAME = "..."`** sets an environment variable in the *current PowerShell window only*.
+>   Anything started from that window sees it, and it's gone when you close the window or
+>   `Remove-Item Env:NAME`. Environment variables set this way override the values in `.env`
+>   (most `.env` loaders never overwrite a variable that already exists).
+
 ```powershell
 # laptop · PowerShell
 cd app\api
@@ -410,6 +439,31 @@ Does the integration suite pass reliably? Run it three times with the worker run
 times with it stopped. Log what you see.
 
 ### 4.6 The health-check checkpoint
+
+> **📘 Learn: health checks and status codes**
+>
+> - **HTTP status codes** are the 3-digit number at the start of every HTTP response. `2xx` means
+>   success (`200 OK`). `4xx` means the *client* made a mistake (`404 Not Found`, `401
+>   Unauthorized`). `5xx` means the *server* has a problem: `500 Internal Server Error` is "my code
+>   failed", and `503 Service Unavailable` is "I'm here, but I can't serve you right now".
+>   Machines read the code, not the text in the body, so the code has to be right.
+> - **Who calls health endpoints?** No person ever does. A load balancer, Docker, Kubernetes or an
+>   uptime monitor calls them every few seconds and *acts automatically* on the status code. The
+>   orchestrator either restarts the process or stops sending it traffic. The endpoint's answer
+>   isn't information, it's an instruction.
+> - **Two questions, two endpoints.** Platforms ask two different questions:
+>   *liveness*: "is this process alive, or stuck so badly that only a restart helps?", and
+>   *readiness*: "can it do useful work right now, so should it get traffic?". The PDF §3 contract
+>   tells you which endpoint answers which question. Working out *why* they must stay separate is
+>   "Prove you understand" Q1, so that's yours to explain after this experiment.
+> - **A dependency** is something outside the process that it needs: here, PostgreSQL and Redis.
+>   Stopping them on purpose simulates a real outage.
+> - **Recovery.** A well-built app keeps a pool of database connections and makes new ones when the
+>   database comes back. "Does it recover without a restart?" tests exactly that.
+> - **The commands.** `Stop-Service` / `Start-Service` control Windows services, which is why the
+>   terminal must run *as Administrator*. Run `Get-Service *postgres*, *redis*` to see the exact
+>   service names on your machine. `curl.exe -w " -> %{http_code}\n"` prints the status code after
+>   the response body, so you see both.
 
 First, re-read the API contract table in §3 of the PDF: what must `/healthz` do, and what must
 `/readyz` do? Write down the expected status code of each **when PostgreSQL is down**.
